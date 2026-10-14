@@ -9,15 +9,22 @@ if not GOOGLE_API_KEY:
 genai.configure(api_key=GOOGLE_API_KEY)
 
 def generate_movie_script():
-    # জেমিনি মডেল ইনিশিয়ালাইজ করা
+    # জেমিনি মডেলের সঠিক নাম ব্যবহার করা
     model = genai.GenerativeModel('gemini-1.5-flash')
     
-    # প্রম্পট যা এআই-কে দিয়ে ট্রেন্ডিং মুভি ও স্ক্রিপ্ট বানাবে
+    # বিকল্প হিসেবে gemini-pro ও ব্যবহার করা যায় যদি এটি কাজ না করে
     prompt = "Find a currently trending popular movie and write an engaging, suspenseful 3-minute movie explanation voiceover script in a storytelling style. Also provide a catchy YouTube title and SEO description."
     
-    response = model.generate_content(prompt)
-    print("--- Generated AI Movie Script ---")
-    print(response.text)
+    try:
+        response = model.generate_content(prompt)
+        print("--- Generated AI Movie Script ---")
+        print(response.text)
+    except Exception as e:
+        # যদি 1.5-flash এ সমস্যা করে তবে জেমিনি প্রফেশনাল মডেল ট্রাই করবে
+        model_fallback = genai.GenerativeModel('gemini-pro')
+        response = model_fallback.generate_content(prompt)
+        print("--- Generated AI Movie Script (Fallback) ---")
+        print(response.text)
 
 if __name__ == "__main__":
     generate_movie_script()
