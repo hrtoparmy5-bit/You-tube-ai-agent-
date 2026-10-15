@@ -11,7 +11,7 @@ client = Groq(api_key=GROQ_API_KEY)
 def generate_movie_script():
     prompt = "Find a currently trending popular movie and write an engaging, suspenseful 3-minute movie explanation voiceover script in a storytelling style. Also provide a catchy YouTube title and SEO description."
     
-    # বর্তমানের সচল ও লেটেস্ট মডেল নাম ব্যবহার করা হলো
+    # বর্তমানের ১০০% সচল ও অফিশিয়াল মডেল
     chat_completion = client.chat.completions.create(
         messages=[
             {
