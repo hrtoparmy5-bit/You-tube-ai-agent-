@@ -2,7 +2,7 @@ import os
 import asyncio
 import edge_tts
 from groq import Groq
-from moviepy.editor import AudioFileClip, ColorClip
+from moviepy import AudioFileClip, ColorClip
 
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 if not GROQ_API_KEY:
@@ -21,17 +21,14 @@ def create_video():
     output_video_path = "output.mp4"
     
     print("Rendering video using MoviePy...")
-    # অডিও ফাইল লোড করা
     audio_clip = AudioFileClip(audio_path)
     duration = audio_clip.duration
     
-    # ব্যাকগ্রাউন্ড হিসেবে একটি সুন্দর ডার্ক ব্লু কালার ক্লিপ তৈরি করা (1280x720 রেজোলিউশন)
+    # 1280x720 রেজোলিউশনের ডার্ক ব্যাকগ্রাউন্ড ক্লিপ
     bg_clip = ColorClip(size=(1280, 720), color=(20, 24, 33), duration=duration)
     
-    # অডিও ক্লিপটি ব্যাকগ্রাউন্ডের সাথে যুক্ত করা
     video_clip = bg_clip.set_audio(audio_clip)
     
-    # ভিডিও ফাইল রেন্ডার করে সেভ করা
     video_clip.write_videofile(
         output_video_path,
         fps=24,
@@ -67,7 +64,7 @@ def generate_movie_script():
             )
             script_content = chat_completion.choices[0].message.content
             print(f"--- Generated AI Movie Script (via {model_name}) ---")
-            print(script_content[:200] + "...") # প্রথম ২০০ ক্যারেক্টার প্রিন্ট করবে
+            print(script_content[:200] + "...")
             success = True
             break
         except Exception as e:
