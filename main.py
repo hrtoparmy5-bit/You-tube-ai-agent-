@@ -26,8 +26,6 @@ def create_video():
     
     # 1280x720 রেজোলিউশনের ডার্ক ব্যাকগ্রাউন্ড ক্লিপ
     bg_clip = ColorClip(size=(1280, 720), color=(20, 24, 33), duration=duration)
-    
-    # লেটেস্ট MoviePy সিনট্যাক্স অনুযায়ী with_audio ব্যবহার করা হলো
     video_clip = bg_clip.with_audio(audio_clip)
     
     video_clip.write_videofile(
@@ -43,20 +41,28 @@ def create_video():
 def generate_movie_script():
     prompt = "Find a currently trending popular movie and write an engaging, suspenseful 3-minute movie explanation voiceover script in a storytelling style. Do not include extra markdown intro, just give the direct voiceover text."
     
+    # গ্রোক সার্ভার থেকে সরাসরি লাইভ সচল মডেলের লিস্ট ফেচ করা (সেল্ফ-হিলিং লজিক)
     try:
         models_response = client.models.list()
-        # শুধুমাত্র সঠিক চ্যাট মডেলগুলো ফিল্টার করার জন্য
-        available_models = [m.id for m in models_response.data if "llama-3" in m.id or "llama3" in m.id]
-        if not available_models:
-            available_models = ["llama-3.1-8b-instant", "llama3-8b-8192"]
-    except Exception:
-        available_models = ["llama-3.1-8b-instant", "llama3-8b-8192"]
+        # যে মডেলগুলোর নামের মধ্যে 'llama' আছে সেগুলোকে স্বয়ংক্রিয়ভাবে ফিল্টার করবে
+        available_models = [m.id for m in models_response.data if "llama" in m.id and "guard" not in m.id]
+        print(f"Discovered active models from Groq: {available_models}")
+    except Exception as e:
+        print(f"Could not fetch models dynamically: {e}")
+        available_models = []
+
+    # যদি ডাইনামিক লিস্ট না পাওয়া যায়, তবে ব্যাকআপ সেফ লিস্ট
+    fallback_models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "llama3-70b-8192", "llama3-8b-8192"]
+    
+    # সব মডেলগুলোকে এক জায়গায় করে ইউনিক লিস্ট তৈরি করা
+    all_models_to_try = available_models + [m for m in fallback_models if m not in available_models]
 
     success = False
     script_content = ""
-    for model_name in available_models:
+    
+    for model_name in all_models_to_try:
         try:
-            print(f"Trying model: {model_name}")
+            print(f"Trying to generate script with model: {model_name}")
             chat_completion = client.chat.completions.create(
                 messages=[
                     {
@@ -67,16 +73,16 @@ def generate_movie_script():
                 model=model_name,
             )
             script_content = chat_completion.choices[0].message.content
-            print(f"--- Generated AI Movie Script (via {model_name}) ---")
+            print(f"--- Successfully Generated AI Movie Script (via {model_name}) ---")
             print(script_content[:200] + "...")
             success = True
             break
         except Exception as e:
-            print(f"Model {model_name} failed: {e}")
+            print(f"Model {model_name} failed/decommissioned. Trying next... Error: {e}")
             continue
             
     if not success:
-        raise RuntimeError("All available models failed.")
+        raise RuntimeError("All dynamic and fallback models failed. Please check your Groq API key or account status.")
 
     # ১. ভয়েসওভার জেনারেট করা
     asyncio.run(generate_voiceover(script_content))
