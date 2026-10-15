@@ -27,7 +27,8 @@ def create_video():
     # 1280x720 রেজোলিউশনের ডার্ক ব্যাকগ্রাউন্ড ক্লিপ
     bg_clip = ColorClip(size=(1280, 720), color=(20, 24, 33), duration=duration)
     
-    video_clip = bg_clip.set_audio(audio_clip)
+    # লেটেস্ট MoviePy সিনট্যাক্স অনুযায়ী with_audio ব্যবহার করা হলো
+    video_clip = bg_clip.with_audio(audio_clip)
     
     video_clip.write_videofile(
         output_video_path,
@@ -44,9 +45,12 @@ def generate_movie_script():
     
     try:
         models_response = client.models.list()
-        available_models = [m.id for m in models_response.data if "llama" in m.id]
+        # শুধুমাত্র সঠিক চ্যাট মডেলগুলো ফিল্টার করার জন্য
+        available_models = [m.id for m in models_response.data if "llama-3" in m.id or "llama3" in m.id]
+        if not available_models:
+            available_models = ["llama-3.1-8b-instant", "llama3-8b-8192"]
     except Exception:
-        available_models = ["llama3-8b-8192"]
+        available_models = ["llama-3.1-8b-instant", "llama3-8b-8192"]
 
     success = False
     script_content = ""
