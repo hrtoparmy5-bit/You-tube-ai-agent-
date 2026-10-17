@@ -3,11 +3,15 @@ import asyncio
 import edge_tts
 from groq import Groq
 import google.generativeai as genai
+import cohere
+from huggingface_hub import InferenceClient
 from moviepy import AudioFileClip, ColorClip
 
-# এপিআই কি গিটহাব সিক্রেট থেকে রিড করা হচ্ছে
+# গিটহাব সিক্রেট থেকে সবগুলোর এপিআই কি রিড করা হচ্ছে
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+COHERE_API_KEY = os.environ.get("COHERE_API_KEY")
+HUGGINGFACE_API_KEY = os.environ.get("HUGGINGFACE_API_KEY")
 
 async def generate_voiceover(text, output_file="voiceover.mp3"):
     voice = "en-US-ChristopherNeural"
@@ -41,7 +45,7 @@ def generate_movie_script():
     
     script_content = None
 
-    # --- AI PROVIDER 1: Groq API ---
+    # --- ১. প্রথমে Groq দিয়ে চেষ্টা করা ---
     if not script_content and GROQ_API_KEY:
         try:
             print("Trying AI Provider 1: Groq...")
@@ -52,40 +56,69 @@ def generate_movie_script():
                     res = client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model=m)
                     script_content = res.choices[0].message.content
                     if script_content:
-                        print(f"Success via Groq ({m})")
+                        print(f"Success! Script generated using Groq ({m})")
                         break
                 except Exception as e:
-                    print(f"Groq {m} error: {e}")
+                    print(f"Groq model {m} encountered an error: {e}. Auto-switching to next model/provider...")
         except Exception as e:
-            print(f"Groq init error: {e}")
+            print(f"Groq initialization failed: {e}")
 
-    # --- AI PROVIDER 2: Google Gemini API ---
+    # --- ২. Groq ফেইল করলে স্বয়ংক্রিয়ভাবে Google Gemini তে যাওয়া ---
     if not script_content and GEMINI_API_KEY:
         try:
-            print("Switching to AI Provider 2: Google Gemini...")
+            print("Auto-switching to AI Provider 2: Google Gemini...")
             genai.configure(api_key=GEMINI_API_KEY)
-            models = ["gemini-1.5-flash", "gemini-1.5-pro"]
+            models = ["gemini-pro", "gemini-1.5-flash"]
             for m in models:
                 try:
                     model = genai.GenerativeModel(m)
                     res = model.generate_content(prompt)
                     if res and res.text:
                         script_content = res.text
-                        print(f"Success via Gemini ({m})")
+                        print(f"Success! Script generated using Gemini ({m})")
                         break
                 except Exception as e:
-                    print(f"Gemini {m} error: {e}")
+                    print(f"Gemini model {m} encountered an error: {e}. Auto-switching to next provider...")
         except Exception as e:
-            print(f"Gemini init error: {e}")
+            print(f"Gemini initialization failed: {e}")
 
-    # চূড়ান্ত চেক
+    # --- ৩. Gemini ফেইল করলে স্বয়ংক্রিয়ভাবে Cohere তে যাওয়া ---
+    if not script_content and COHERE_API_KEY:
+        try:
+            print("Auto-switching to AI Provider 3: Cohere...")
+            co = cohere.Client(COHERE_API_KEY)
+            response = co.chat(
+                model='command',
+                message=prompt,
+            )
+            if response and response.text:
+                script_content = response.text
+                print("Success! Script generated using Cohere (command)")
+        except Exception as e:
+            print(f"Cohere encountered an error: {e}. Auto-switching to next provider...")
+
+    # --- ৪. সবকটি ফেইল করলে শেষ ভরসা হিসেবে Hugging Face এ যাওয়া ---
+    if not script_content and HUGGINGFACE_API_KEY:
+        try:
+            print("Auto-switching to AI Provider 4: Hugging Face...")
+            client = InferenceClient(api_key=HUGGINGFACE_API_KEY)
+            response = client.chat.completions.create(
+                model="mistralai/Mistral-7B-Instruct-v0.3",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=1000,
+            )
+            script_content = response.choices[0].message.content
+            if script_content:
+                print("Success! Script generated using Hugging Face Mistral")
+        except Exception as e:
+            print(f"Hugging Face encountered an error: {e}")
+
+    # চূড়ান্ত নিরাপত্তা চেক: যদি কোনো এআই-ই কাজ না করে
     if not script_content:
-        raise RuntimeError("Both Groq and Gemini failed. Please check your API keys.")
+        raise RuntimeError("Autonomous Fail-safe Error: All configured AI providers failed to generate a script. Please verify your API keys.")
 
-    # ১. ভয়েসওভার জেনারেট করা
+    # সফলভাবে স্ক্রিপ্ট পাওয়ার পর ভয়েসওভার ও ভিডিও তৈরি করা
     asyncio.run(generate_voiceover(script_content))
-    
-    # ২. ভিডিও রেন্ডার করা
     create_video()
 
 if __name__ == "__main__":
