@@ -3,15 +3,11 @@ import asyncio
 import edge_tts
 from groq import Groq
 import google.generativeai as genai
-import cohere
-from huggingface_hub import InferenceClient
 from moviepy import AudioFileClip, ColorClip
 
-# বিভিন্ন এআই প্রোভাইডারের এপিআই কি গিটহাব সিক্রেট থেকে রিড করা হচ্ছে
+# এপিআই কি গিটহাব সিক্রেট থেকে রিড করা হচ্ছে
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
-COHERE_API_KEY = os.environ.get("COHERE_API_KEY")
-HUGGINGFACE_API_KEY = os.environ.get("HUGGINGFACE_API_KEY")
 
 async def generate_voiceover(text, output_file="voiceover.mp3"):
     voice = "en-US-ChristopherNeural"
@@ -82,40 +78,9 @@ def generate_movie_script():
         except Exception as e:
             print(f"Gemini init error: {e}")
 
-    # --- AI PROVIDER 3: Cohere API (Updated model name) ---
-    if not script_content and COHERE_API_KEY:
-        try:
-            print("Switching to AI Provider 3: Cohere...")
-            co = cohere.Client(COHERE_API_KEY)
-            response = co.chat(
-                model='command-r',
-                message=prompt,
-            )
-            if response and response.text:
-                script_content = response.text
-                print("Success via Cohere (command-r)")
-        except Exception as e:
-            print(f"Cohere error: {e}")
-
-    # --- AI PROVIDER 4: Hugging Face Inference API ---
-    if not script_content and HUGGINGFACE_API_KEY:
-        try:
-            print("Switching to AI Provider 4: Hugging Face...")
-            client = InferenceClient(api_key=HUGGINGFACE_API_KEY)
-            response = client.chat.completions.create(
-                model="mistralai/Mistral-7B-Instruct-v0.3",
-                messages=[{"role": "user", "content": prompt}],
-                max_tokens=1000,
-            )
-            script_content = response.choices[0].message.content
-            if script_content:
-                print("Success via Hugging Face Mistral")
-        except Exception as e:
-            print(f"Hugging Face error: {e}")
-
-    # চূড়ান্ত চেক: যদি একটি এআইও সচল না থাকে
+    # চূড়ান্ত চেক
     if not script_content:
-        raise RuntimeError("All configured AI providers failed. Please check your API keys.")
+        raise RuntimeError("Both Groq and Gemini failed. Please check your API keys.")
 
     # ১. ভয়েসওভার জেনারেট করা
     asyncio.run(generate_voiceover(script_content))
