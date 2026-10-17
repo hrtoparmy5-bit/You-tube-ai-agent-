@@ -102,7 +102,7 @@ def generate_movie_script():
         try:
             print("Switching to AI Provider 4: Hugging Face...")
             client = InferenceClient(api_key=HUGGINGFACE_API_KEY)
-            response = client.chat_completion(
+            response = client.chat.completions.create(
                 model="mistralai/Mistral-7B-Instruct-v0.3",
                 messages=[{"role": "user", "content": prompt}],
                 max_tokens=1000,
