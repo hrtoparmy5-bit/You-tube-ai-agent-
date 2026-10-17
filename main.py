@@ -82,18 +82,18 @@ def generate_movie_script():
         except Exception as e:
             print(f"Gemini init error: {e}")
 
-    # --- AI PROVIDER 3: Cohere API ---
+    # --- AI PROVIDER 3: Cohere API (Updated model name) ---
     if not script_content and COHERE_API_KEY:
         try:
             print("Switching to AI Provider 3: Cohere...")
             co = cohere.Client(COHERE_API_KEY)
             response = co.chat(
-                model='command-r-plus',
+                model='command-r',
                 message=prompt,
             )
             if response and response.text:
                 script_content = response.text
-                print("Success via Cohere (command-r-plus)")
+                print("Success via Cohere (command-r)")
         except Exception as e:
             print(f"Cohere error: {e}")
 
