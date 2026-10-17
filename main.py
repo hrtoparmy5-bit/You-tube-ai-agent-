@@ -2,10 +2,16 @@ import os
 import asyncio
 import edge_tts
 from groq import Groq
+import google.generativeai as genai
+import cohere
+from huggingface_hub import InferenceClient
 from moviepy import AudioFileClip, ColorClip
 
-# ইউনিভার্সাল বা ফ্রি এগ্রিগেটর এপিআই কি
-UNIVERSAL_API_KEY = os.environ.get("UNIVERSAL_API_KEY")
+# বিভিন্ন এআই প্রোভাইডারের এপিআই কি গিটহাব সিক্রেট থেকে রিড করা হচ্ছে
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
+COHERE_API_KEY = os.environ.get("COHERE_API_KEY")
+HUGGINGFACE_API_KEY = os.environ.get("HUGGINGFACE_API_KEY")
 
 async def generate_voiceover(text, output_file="voiceover.mp3"):
     voice = "en-US-ChristopherNeural"
@@ -37,36 +43,79 @@ def create_video():
 def generate_movie_script():
     prompt = "Find a currently trending popular movie and write an engaging, suspenseful 3-minute movie explanation voiceover script in a storytelling style. Do not include extra markdown intro, just give the direct voiceover text."
     
-    if not UNIVERSAL_API_KEY:
-        raise ValueError("UNIVERSAL_API_KEY environment variable is not set!")
-
-    # যেহেতু এই প্ল্যাটফর্মগুলো OpenAI কম্প্যাটিবল বেস ইউআরএল ব্যবহার করে, তাই বেস ইউআরএল সেট করতে হবে
-    # (যদি সাইটটির নিজস্ব কাস্টম বেস ইউআরএল থাকে তা এখানে বসাতে হবে)
-    client = Groq(
-        api_key=UNIVERSAL_API_KEY,
-        base_url="https://api.freellmapi.co/v1" # উদাহরণস্বরূপ ফ্রি এলএলএম এপিআই বেস ইউআরএল
-    )
-
-    models_to_try = ["gpt-4o", "claude-3-5-sonnet", "llama-3.3-70b-versatile"]
     script_content = None
 
-    for model_name in models_to_try:
+    # --- AI PROVIDER 1: Groq API ---
+    if not script_content and GROQ_API_KEY:
         try:
-            print(f"Trying model via Universal API: {model_name}")
-            chat_completion = client.chat.completions.create(
-                messages=[{"role": "user", "content": prompt}],
-                model=model_name,
-            )
-            script_content = chat_completion.choices[0].message.content
-            if script_content:
-                print(f"Successfully generated script using {model_name}")
-                break
+            print("Trying AI Provider 1: Groq...")
+            client = Groq(api_key=GROQ_API_KEY)
+            models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
+            for m in models:
+                try:
+                    res = client.chat.completions.create(messages=[{"role": "user", "content": prompt}], model=m)
+                    script_content = res.choices[0].message.content
+                    if script_content:
+                        print(f"Success via Groq ({m})")
+                        break
+                except Exception as e:
+                    print(f"Groq {m} error: {e}")
         except Exception as e:
-            print(f"Model {model_name} failed: {e}")
-            continue
+            print(f"Groq init error: {e}")
 
+    # --- AI PROVIDER 2: Google Gemini API ---
+    if not script_content and GEMINI_API_KEY:
+        try:
+            print("Switching to AI Provider 2: Google Gemini...")
+            genai.configure(api_key=GEMINI_API_KEY)
+            models = ["gemini-1.5-flash", "gemini-1.5-pro"]
+            for m in models:
+                try:
+                    model = genai.GenerativeModel(m)
+                    res = model.generate_content(prompt)
+                    if res and res.text:
+                        script_content = res.text
+                        print(f"Success via Gemini ({m})")
+                        break
+                except Exception as e:
+                    print(f"Gemini {m} error: {e}")
+        except Exception as e:
+            print(f"Gemini init error: {e}")
+
+    # --- AI PROVIDER 3: Cohere API ---
+    if not script_content and COHERE_API_KEY:
+        try:
+            print("Switching to AI Provider 3: Cohere...")
+            co = cohere.Client(COHERE_API_KEY)
+            response = co.chat(
+                model='command-r-plus',
+                message=prompt,
+            )
+            if response and response.text:
+                script_content = response.text
+                print("Success via Cohere (command-r-plus)")
+        except Exception as e:
+            print(f"Cohere error: {e}")
+
+    # --- AI PROVIDER 4: Hugging Face Inference API ---
+    if not script_content and HUGGINGFACE_API_KEY:
+        try:
+            print("Switching to AI Provider 4: Hugging Face...")
+            client = InferenceClient(api_key=HUGGINGFACE_API_KEY)
+            response = client.chat_completion(
+                model="mistralai/Mistral-7B-Instruct-v0.3",
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=1000,
+            )
+            script_content = response.choices[0].message.content
+            if script_content:
+                print("Success via Hugging Face Mistral")
+        except Exception as e:
+            print(f"Hugging Face error: {e}")
+
+    # চূড়ান্ত চেক: যদি একটি এআইও সচল না থাকে
     if not script_content:
-        raise RuntimeError("All models failed on the universal API provider.")
+        raise RuntimeError("All configured AI providers failed. Please check your API keys.")
 
     # ১. ভয়েসওভার জেনারেট করা
     asyncio.run(generate_voiceover(script_content))
